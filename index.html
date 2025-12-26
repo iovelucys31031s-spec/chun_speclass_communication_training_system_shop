@@ -1,0 +1,944 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>我是購物小達人</title>
+    
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+
+    <style>
+        :root {
+            /* SEVENTEEN 應援色 */
+            --rose-quartz: #F7CAC9;
+            --serenity: #92A8D1;
+            --rose-dark: #d68c8b;
+            --serenity-dark: #6e86b3;
+            --gradient-bar: linear-gradient(90deg, #92A8D1 0%, #F7CAC9 100%);
+            
+            --text-boss: #FFFFFF;
+            --text-cust: #444444;
+            --bg-boss-btn: #5b7bb2;
+            --bg-cust-btn: #e07b7b;
+        }
+
+        * { box-sizing: border-box; }
+
+        html, body { height: 100%; width: 100%; overflow: hidden; }
+
+        body {
+            font-family: "Microsoft JhengHei", "Heiti TC", sans-serif;
+            margin: 0; padding: 0;
+            background: linear-gradient(180deg, var(--serenity) 0%, var(--rose-quartz) 100%);
+            display: flex; justify-content: center; align-items: flex-start;
+            padding-top: 10px;
+        }
+
+        .container {
+            width: 96%; max-width: 1000px;
+            height: calc(100dvh - 110px); 
+            background: rgba(255, 255, 255, 0.96);
+            border-radius: 20px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+            padding: 15px;
+            display: flex; flex-direction: column;
+            position: relative; overflow: hidden;
+        }
+
+        .boss-mode .container { border: 5px solid var(--serenity); }
+        .boss-mode h1, .boss-mode h2, .boss-mode p, .boss-mode label { color: var(--text-cust); }
+        .boss-mode #game-view h1 { color: var(--serenity-dark); }
+        .cust-mode .container { border: 5px solid var(--rose-quartz); }
+        
+        h1 { text-align: center; margin: 5px 0 10px 0; font-size: clamp(1.5rem, 4vw, 2.5rem); color: #444; flex-shrink: 0; }
+        h2 { text-align: center; margin: 5px 0; font-size: clamp(1.2rem, 3vw, 1.8rem); color: #555; flex-shrink: 0; }
+        .hidden { display: none !important; }
+        
+        .btn {
+            font-size: clamp(1rem, 2.5vw, 1.4rem); padding: 10px 20px; margin: 5px;
+            border: none; border-radius: 50px; cursor: pointer; transition: all 0.2s;
+            font-weight: bold; box-shadow: 0 3px 5px rgba(0,0,0,0.15);
+            display: inline-block; color: white; flex-shrink: 0;
+        }
+        .btn:active { transform: scale(0.95); }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-primary { background-color: var(--serenity-dark); }
+        .btn-danger { background-color: var(--rose-dark); }
+        .btn-success { background-color: #66bb6a; }
+        .btn-warning { background-color: #ff9800; } 
+        .btn-info { background-color: #607d8b; }
+        .btn-light { background-color: #f0f0f0; color: #666; border: 1px solid #ccc; }
+        
+        .btn-action { 
+            font-size: clamp(1.4rem, 4vw, 1.8rem); padding: 12px 60px; 
+            margin: 10px auto 0 auto; white-space: nowrap; width: auto; 
+            display: block; box-shadow: 0 5px 15px rgba(0,0,0,0.2); flex-shrink: 0;
+        }
+        .boss-mode .btn-action { background-color: var(--bg-boss-btn); }
+        .cust-mode .btn-action { background-color: var(--bg-cust-btn); }
+
+        input, select, textarea {
+            font-size: 1.2rem; padding: 8px; margin: 5px 0;
+            border-radius: 8px; border: 2px solid #ddd;
+            width: 80%; display: block; margin-left: auto; margin-right: auto;
+            text-align: center;
+        }
+
+        .store-name-input {
+            font-size: 1.2rem; font-weight: bold; padding: 5px; width: 200px;
+            border: 2px dashed var(--serenity); background: #fff;
+            display: inline-block; margin: 0; text-align: left;
+            border-radius: 5px; color: #333;
+        }
+        
+        #game-view { display: flex; flex-direction: column; height: 100%; width: 100%; overflow: hidden; }
+
+        .script-bubble {
+            flex: 0 0 auto; background: #fff; border-radius: 15px;
+            padding: 10px; margin: 5px auto 10px auto;
+            font-size: clamp(1.2rem, 3.5vw, 2rem); font-weight: bold; text-align: center;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1); color: #333;
+            width: 98%; border: 3px solid; line-height: 1.3;
+            min-height: 80px; display: flex; align-items: center; justify-content: center; gap: 10px;
+        }
+        .boss-mode .script-bubble { border-color: var(--serenity-dark); color: var(--serenity-dark); }
+        .cust-mode .script-bubble { border-color: var(--rose-dark); color: var(--rose-dark); }
+        .speech-icon { font-size: 2.5rem; }
+
+        .boss-l5-hint {
+            white-space: nowrap; 
+            overflow: hidden; 
+            text-overflow: ellipsis; 
+            width: 100%;
+            font-size: clamp(0.7rem, 2vw, 1.4rem); 
+            color: #555;
+            background: #f0f0f0;
+            padding: 5px;
+            border-radius: 5px;
+            margin-bottom: 5px;
+        }
+
+        .card-panel {
+            background: rgba(240, 248, 255, 0.5); border: 2px solid #e0e0e0;
+            flex: 1 1 auto; padding: 10px; border-radius: 15px; margin-bottom: 5px;
+            display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
+            text-align: center; overflow-y: auto; -webkit-overflow-scrolling: touch;
+            width: 100%; min-height: 0;
+        }
+
+        .item-grid { display: flex; flex-wrap: wrap; justify-content: center; gap: 15px; width: 100%; padding-bottom: 10px; }
+        .item-card {
+            background: white; border-radius: 10px; padding: 8px; width: 120px;
+            box-shadow: 0 3px 8px rgba(0,0,0,0.1); position: relative;
+            cursor: pointer; color: #333; border: 3px solid transparent;
+            transition: transform 0.1s; flex-shrink: 0;
+        }
+        .item-card:active { transform: scale(0.95); }
+        .item-card.selected { border-color: var(--rose-dark); background-color: #fff0f0; }
+        .item-card.disabled-item { opacity: 0.5; cursor: not-allowed; filter: grayscale(1); background-color: #eee; }
+
+        .item-img { font-size: 3rem; display: block; margin-bottom: 5px; }
+        .item-img-real { width: 70px; height: 70px; object-fit: contain; display: block; margin: 0 auto 5px auto; }
+        .item-name { font-size: 1.1rem; font-weight: bold; display: block; }
+        .item-stock { font-size: 0.9rem; color: #666; display: block;}
+        .item-price { color: #d32f2f; font-weight: bold; font-size: 1.2rem; margin-top: 2px;}
+        
+        .badge-oos { 
+            position: absolute; top: 5px; right: 5px; width: auto; height: auto; 
+            background: rgba(255, 255, 255, 0.9); border-radius: 5px; padding: 2px 5px;
+            color: red; font-size: 1.2rem; font-weight: bold; 
+            border: 2px solid red; transform: rotate(15deg);
+            z-index: 10;
+        }
+        .item-card.oos-style .item-img, .item-card.oos-style .item-img-real {
+            filter: grayscale(0.8) opacity(0.6);
+        }
+
+        .check-item {
+            font-size: 1.4rem; margin: 5px; padding: 10px;
+            background: white; border-radius: 10px; width: 95%;
+            cursor: pointer; display: flex; justify-content: space-between;
+            align-items: center; color: #333;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1); border: 2px solid #eee;
+        }
+        .check-item.checked { background: #e8f5e9; color: #2e7d32; border-color: #2e7d32; }
+        .check-box { width: 30px; height: 30px; border: 2px solid #ccc; display: inline-block; border-radius: 5px; background:white;}
+        .check-item.checked .check-box { background: #2e7d32; border-color: #2e7d32; }
+        .check-item.checked .check-box::after { content: '✔'; display:block; color:white; font-size:22px; text-align:center; line-height:28px; }
+
+        .pos-del-btn { background: var(--rose-dark); color: white; border: none; border-radius: 50%; width: 25px; height: 25px; font-size: 0.9rem; font-weight: bold; cursor: pointer; margin-left: 10px; }
+
+        .big-input { 
+            font-size: 2.5rem; width: 180px; height: 60px; 
+            border: 4px solid var(--serenity-dark); border-radius: 15px; 
+            color: #333; background: #fff; text-align: center; 
+        }
+        
+        .math-hint-container { display: flex; align-items: center; justify-content: center; gap: 10px; margin: 10px 0; flex-wrap: wrap; }
+        .math-input-group { display: flex; flex-direction: column; align-items: center; }
+        .math-label { font-size: 0.9rem; color: #666; margin-bottom: 5px; }
+        .math-gap {
+            font-size: 1.8rem; width: 100px; padding: 5px;
+            border: 2px solid #ccc; border-radius: 5px; text-align: center;
+        }
+        .math-symbol { font-size: 2rem; font-weight: bold; color: var(--rose-dark); }
+
+        /* Admin Layout */
+        #admin-view { display: flex; flex-direction: column; height: 100%; overflow: hidden; }
+        .admin-header-area { flex: 0 0 auto; border-bottom: 2px solid #eee; padding-bottom: 10px; margin-bottom: 10px; }
+        #admin-list-container { flex: 1 1 auto; overflow-y: auto; min-height: 0; padding-right: 5px; }
+        .admin-store-box { background: white; padding: 10px 15px; margin: 10px 0; border-radius: 10px; color: #333; text-align: left; border-left: 8px solid var(--serenity); box-shadow: 0 2px 6px rgba(0,0,0,0.1); }
+        .store-header { display: flex; justify-content: space-between; align-items: center; cursor: pointer; user-select: none; }
+        .store-toggle-icon { font-size: 1.5rem; transition: transform 0.3s; margin-right: 10px; color:#666; }
+        .store-items { margin-top: 10px; border-top: 1px solid #eee; padding-top: 10px; }
+        .store-items.collapsed { display: none; }
+        .admin-item-row { display: flex; align-items: center; gap: 5px; border-bottom: 1px solid #f0f0f0; padding: 8px 0; flex-wrap: wrap; }
+        .file-upload-btn { font-size: 0.8rem; padding: 5px 10px; background: #f9f9f9; border: 1px solid #ccc; cursor: pointer; border-radius: 5px; }
+        .csv-import-box { background: #f0f4f8; border-radius: 10px; padding: 10px; margin-bottom: 10px; border: 2px dashed #92A8D1; }
+        .sync-box { background: #e3f2fd; border-radius: 10px; padding: 10px; margin-bottom: 10px; border: 2px solid #92A8D1; display:flex; justify-content: space-around; align-items: center; flex-wrap: wrap; gap:10px;}
+        
+        .oos-row { background: #fff8e1; border: 1px solid #ffcc80; padding: 10px; margin-bottom: 10px; border-radius: 8px; }
+        .oos-row label { color: #e65100; font-size: 0.9rem; margin-bottom: 5px; display: block; text-align: left; }
+
+        /* Progress Bar */
+        .bottom-progress-bar {
+            position: fixed; bottom: 0; left: 0; width: 100%; height: 90px;
+            background: white; display: flex; align-items: flex-start;
+            justify-content: center; box-shadow: 0 -5px 20px rgba(0,0,0,0.1);
+            z-index: 1000; padding-top: 10px;
+        }
+        .progress-track-container {
+            position: absolute; bottom: 25px; left: 0; right: 0; height: 8px; 
+            margin: 0 calc(100% / var(--step-count) / 2); z-index: 0;
+        }
+        .progress-track-bg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #eee; border-radius: 4px; }
+        .progress-track-fill {
+            position: absolute; top: 0; left: 0; height: 100%; width: 0%;
+            background: var(--gradient-bar); border-radius: 4px;
+            transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 0 10px rgba(146, 168, 209, 0.5);
+        }
+        .progress-step {
+            flex: 1; text-align: center; position: relative; z-index: 1; height: 100%;
+            display: flex; flex-direction: column; justify-content: flex-start;
+        }
+        .progress-step span {
+            font-size: 1.1rem; color: #bbb; font-weight: bold; display: block;
+            margin-top: 5px; transition: color 0.3s;
+        }
+        .progress-step::after {
+            content: ''; width: 20px; height: 20px; background: #ddd; border-radius: 50%;
+            position: absolute; bottom: 19px; left: 50%; transform: translateX(-50%);
+            border: 3px solid white; transition: all 0.4s; box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .progress-step.active span { color: var(--serenity-dark); transform: scale(1.1); }
+        .progress-step.active::after { background: var(--rose-dark); transform: translateX(-50%) scale(1.3); box-shadow: 0 0 10px var(--rose-quartz); }
+
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.6); z-index: 2000; display: flex;
+            justify-content: center; align-items: center; backdrop-filter: blur(5px);
+        }
+        .modal-box {
+            background: white; padding: 40px; border-radius: 20px;
+            width: 80%; max-width: 500px; text-align: left;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.3); max-height: 90vh; overflow-y: auto;
+        }
+        .modal-box h3 { text-align: center; }
+        
+        #setup-scroll-area { flex: 1; overflow-y: auto; padding: 5px; min-height: 0; }
+        .status-dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; margin-right: 5px; vertical-align: middle; }
+        .status-offline { background-color: #ccc; }
+        .status-online { background-color: #4caf50; box-shadow: 0 0 5px #4caf50; }
+        .status-connecting { background-color: #ff9800; animation: blink 1s infinite; }
+        @keyframes blink { 50% { opacity: 0.5; } }
+        .tutorial-step { margin-bottom: 15px; border-bottom: 1px dashed #eee; padding-bottom: 10px; }
+        .code-block { background: #f5f5f5; padding: 10px; border-radius: 5px; font-family: monospace; font-size: 0.8rem; word-break: break-all; border: 1px solid #ddd; margin-top: 5px;}
+    </style>
+</head>
+<body id="body-tag">
+
+<div class="container" id="app">
+    <div id="home-view">
+        <h1 style="color:#444; font-size: 3rem; margin-top: 10vh; font-weight:900;">我是購物小達人</h1>
+        <br>
+        <div style="display:flex; flex-direction:column; align-items:center; gap:20px;">
+            <button class="btn btn-primary" style="width:280px; padding:20px; font-size:1.5rem;" onclick="promptPassword('game')">🎮 開始遊戲</button>
+            <button class="btn btn-danger" style="width:280px; padding:20px; font-size:1.5rem;" onclick="promptPassword('admin')">🛠️ 商店後台管理</button>
+        </div>
+    </div>
+
+    <div id="setup-view" class="hidden" style="display:flex; flex-direction:column; height:100%;">
+        <h2 style="color:#444; font-size:2rem; border-bottom: 2px solid #eee; padding-bottom:10px; flex-shrink:0;">⚙️ 課程設定</h2>
+        
+        <div id="setup-scroll-area">
+            <label>1. 選擇商店 (雙機需一致)：</label>
+            <select id="store-select" onchange="updateOOSSelector()"></select>
+            <label>2. 選擇劇本 (雙機需一致)：</label>
+            <select id="level-select" onchange="updateSetupUI()">
+                <option value="1">Level 1：自由選購 (基礎)</option>
+                <option value="2">Level 2：清單購物 (視覺指定)</option>
+                <option value="3">Level 3：自由點餐 (POS/聽覺)</option>
+                <option value="4">Level 4：指定點餐 (POS/視覺任務)</option>
+                <option value="5">Level 5：缺貨替代 (應變)</option>
+                <option value="6">Level 6：魔王混合 (隨機)</option>
+            </select>
+            <div id="setup-quantity">
+                <label id="quantity-label">3. 本回合要買幾樣商品？</label>
+                <input type="number" id="item-quantity" value="2" min="1" max="5">
+            </div>
+            
+            <!-- Level 5 專用設定 -->
+            <div id="setup-oos-area" class="hidden" style="background:#fff3e0; padding:10px; border-radius:10px; border:2px dashed #ff9800; margin:5px 0;">
+                <label style="color:#e65100;">🚨 指定缺貨數量：</label>
+                <input type="number" id="oos-count" value="1" min="1" max="3" onchange="updateOOSSelector()">
+                
+                <div id="oos-pairs-container" style="margin-top:10px;"></div>
+
+                <hr style="border-top:1px dashed #ffb74d;">
+                <label style="color:#e65100;">🤔 缺貨時客人的回應方式：</label>
+                <select id="alt-response-mode">
+                    <option value="specific">那請問有 [替代品] 嗎？ (簡單/直接引導)</option>
+                    <option value="open">請問還有什麼？ (進階/社交應對)</option>
+                </select>
+            </div>
+
+            <div id="setup-duplicate" class="hidden">
+                <label>4. 清單品項是否可重複？</label>
+                <select id="allow-duplicate">
+                    <option value="no">不重複</option>
+                    <option value="yes">可重複</option>
+                </select>
+            </div>
+            <label>設定本平板角色：</label>
+            <select id="role-select" onchange="updateSetupUI()">
+                <option value="boss">我是老闆</option>
+                <option value="cust">我是客人</option>
+            </select>
+            <div id="boss-settings" class="hidden">
+                <label>數學難度：</label>
+                <select id="math-diff">
+                    <option value="10">10以內加減</option>
+                    <option value="100s">100以內不進退</option>
+                    <option value="100h">100以內進退位</option>
+                    <option value="mix">混合模式</option>
+                </select>
+                <!-- 新增：找錢算式提示設定 -->
+                <label style="color:var(--rose-dark); font-weight:bold;">找錢算式提示：</label>
+                <select id="math-hint-mode">
+                    <option value="direct">模式A：直接給算式 (100-76=__)</option>
+                    <option value="fill">模式B：需填空 (___-___=___)</option>
+                </select>
+            </div>
+            <div id="cust-settings" class="hidden">
+                <div id="menu-setting" class="hidden">
+                    <label>是否顯示圖片菜單 (L3專用)：</label>
+                    <select id="show-menu">
+                        <option value="yes">顯示菜單</option>
+                        <option value="no">隱藏 (聽覺記憶)</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+        <div style="display:flex; justify-content:center; margin-top: 10px; gap: 10px; padding-bottom: 5px; flex-shrink:0;">
+            <button class="btn btn-primary" onclick="startGame()">🚀 進入賣場</button>
+            <button class="btn btn-danger" onclick="backToHome()">🏠 返回首頁</button>
+        </div>
+    </div>
+
+    <!-- 遊戲主畫面 -->
+    <div id="game-view" class="hidden">
+        <div id="script-area" class="script-bubble hidden"></div>
+        <div id="card-area" class="card-panel"></div>
+        <button id="main-action-btn" class="btn btn-action" onclick="nextStep()">下一步</button>
+    </div>
+
+    <!-- 後台管理 -->
+    <div id="admin-view" class="hidden">
+        <div class="admin-header-area">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <h2 style="color:#444; margin:0;">📦 商店後台管理</h2>
+                <div style="font-size:0.9rem; color:#666; display:flex; align-items:center;">
+                    <span id="cloud-status-dot" class="status-dot status-offline"></span>
+                    <span id="cloud-status-text">未連線</span>
+                </div>
+            </div>
+            
+            <div class="sync-box">
+                <span style="font-weight:bold; color:#555; width:100%; text-align:center;">🔄 跨裝置資料轉移</span>
+                <button class="btn btn-success" style="font-size:0.9rem; padding:8px 15px; margin:0;" onclick="exportJSON()">📤 匯出本機資料 (備份)</button>
+                <label class="btn btn-warning" style="font-size:0.9rem; padding:8px 15px; margin:0; cursor:pointer;">
+                    📥 匯入資料 (覆蓋本機)
+                    <input type="file" accept=".json" style="display:none" onchange="importJSON(this)">
+                </label>
+                <button class="btn btn-light" style="font-size:0.8rem; padding:5px 10px;" onclick="openConfigModal()">☁️ 進階雲端設定</button>
+            </div>
+
+            <div class="csv-import-box">
+                <h4 style="margin:5px 0;">📁 批量新增商品 (CSV)</h4>
+                <div style="display:flex; justify-content:center; gap:10px; align-items:center; flex-wrap:wrap;">
+                    <button class="btn" style="font-size:0.9rem; padding:5px 10px; background:#fff; color:#333; border:1px solid #ccc;" onclick="downloadSampleCSV()">⬇️ 下載範例</button>
+                    <label class="btn btn-primary" style="font-size:0.9rem; padding:5px 10px; cursor:pointer;">
+                        📂 選擇CSV
+                        <input type="file" accept=".csv" style="display:none" onchange="processCSV(this)">
+                    </label>
+                </div>
+                <p style="font-size:0.8rem; color:#666; margin:5px 0 0 0;">格式：商店名稱,商品名稱,庫存</p>
+            </div>
+            
+            <div style="text-align:center; display:flex; justify-content:center; gap:5px; flex-wrap:wrap; margin-top:10px;">
+                 <button class="btn btn-success" style="font-size:1rem; padding:8px 15px;" onclick="addNewStore()">+ 新增商店</button>
+                 <button class="btn btn-primary" style="font-size:1rem; padding:8px 15px;" onclick="resetDefaultData()">重置資料</button>
+                 <button class="btn btn-danger" style="font-size:1rem; padding:8px 15px;" onclick="backToHome()">返回</button>
+            </div>
+        </div>
+        <div id="admin-list-container">
+            <div id="admin-list"></div>
+        </div>
+    </div>
+</div>
+
+<div id="progress-bar" class="bottom-progress-bar hidden"></div>
+
+<div id="pwd-modal" class="modal-overlay hidden">
+    <div class="modal-box" style="text-align:center;">
+        <h3 style="font-size:1.8rem; margin-bottom:20px;">🔒 請輸入密碼</h3>
+        <input type="password" id="modal-pwd-input" style="font-size:2rem; width:100%; margin-bottom:20px;">
+        <br>
+        <button class="btn btn-primary" onclick="checkPassword()">確認</button>
+        <button class="btn btn-danger" onclick="closeModal()">取消</button>
+    </div>
+</div>
+
+<div id="config-modal" class="modal-overlay hidden">
+    <div class="modal-box">
+        <h3 style="margin-top:0;">☁️ 進階：Google Firebase 連線</h3>
+        <p style="font-size:0.9rem; color:#666;">若您懂得設定 Google Firebase Firestore，可在此貼上設定檔以啟用即時同步。</p>
+        <textarea id="firebase-config-input" rows="6" style="width:100%; font-size:0.8rem; border:2px solid #ccc; padding:5px; border-radius:5px;" placeholder='在此貼上 firebaseConfig JSON (例如: {"apiKey": "...", ...})'></textarea>
+        <p id="config-error-msg" style="color:red; font-size:0.8rem; display:none;">格式錯誤或連線失敗，請檢查網路或代碼。</p>
+        <br><br>
+        <button class="btn btn-success" onclick="saveFirebaseConfig()">🔗 連線並儲存</button>
+        <button class="btn btn-danger" onclick="document.getElementById('config-modal').classList.add('hidden')">關閉</button>
+    </div>
+</div>
+
+<script>
+// --- Global State ---
+const defaultStores = [
+    {id:'s1', name:'美味漢堡店', items:[{id:1, name:'漢堡', icon:'🍔', imgType:'icon', stock:5}, {id:2, name:'薯條', icon:'🍟', imgType:'icon', stock:5}, {id:3, name:'可樂', icon:'🥤', imgType:'icon', stock:5}, {id:4, name:'雞塊', icon:'🍗', imgType:'icon', stock:0}]},
+    {id:'s2', name:'陽光文具店', items:[{id:1, name:'鉛筆', icon:'✏️', imgType:'icon', stock:10}, {id:2, name:'橡皮擦', icon:'🟦', imgType:'icon', stock:10}, {id:3, name:'筆記本', icon:'📓', imgType:'icon', stock:5}, {id:4, name:'剪刀', icon:'✂️', imgType:'icon', stock:5}]},
+    {id:'s3', name:'快樂便利商店', items:[{id:1, name:'牛奶', icon:'🥛', imgType:'icon', stock:5}, {id:2, name:'麵包', icon:'🍞', imgType:'icon', stock:5}]},
+    {id:'s4', name:'甜蜜麵包店', items:[{id:1, name:'甜甜圈', icon:'🍩', imgType:'icon', stock:5}, {id:2, name:'蛋糕', icon:'🍰', imgType:'icon', stock:5}]},
+    {id:'s5', name:'夢想玩具店', items:[{id:1, name:'機器人', icon:'🤖', imgType:'icon', stock:2}, {id:2, name:'小熊', icon:'🧸', imgType:'icon', stock:2}]}
+];
+
+let stores = []; let session = {}; let db = null; let useCloud = false; let targetView = '';
+
+// --- Init ---
+function initApp() {
+    const configStr = localStorage.getItem('firebase_config_custom');
+    if (configStr) { try { updateCloudStatus('connecting'); initFirebase(JSON.parse(configStr)); } catch(e) { console.error("Config Error", e); loadLocalStores(); } } 
+    else { loadLocalStores(); }
+}
+function initFirebase(config) { if (!firebase.apps.length) firebase.initializeApp(config); db = firebase.firestore(); subscribeToStores(); }
+function updateCloudStatus(status) { const dot = document.getElementById('cloud-status-dot'); const text = document.getElementById('cloud-status-text'); if(status === 'online') { dot.className = "status-dot status-online"; text.innerText = "已連線同步中"; } else if (status === 'connecting') { dot.className = "status-dot status-connecting"; text.innerText = "連線中..."; } else { dot.className = "status-dot status-offline"; text.innerText = "未連線 (本機模式)"; } }
+function loadLocalStores() { stores = JSON.parse(localStorage.getItem('stores')) || JSON.parse(JSON.stringify(defaultStores)); updateCloudStatus('offline'); }
+function subscribeToStores() { db.collection('shopping_data').doc('main').onSnapshot(doc => { useCloud = true; updateCloudStatus('online'); if (doc.exists) { stores = doc.data().stores; refreshUI(); } else { saveStoresToCloud(); } }, error => { console.error("Cloud Error:", error); useCloud = false; updateCloudStatus('offline'); if(stores.length === 0) loadLocalStores(); }); }
+function refreshUI() { if (!document.getElementById('setup-view').classList.contains('hidden')) { const sel = document.getElementById('store-select'); const curr = sel.value; sel.innerHTML = stores.map(s => `<option value="${s.id}">${s.name}</option>`).join(''); if(curr && stores.find(s=>s.id===curr)) sel.value = curr; else if(stores.length > 0) sel.value = stores[0].id; updateOOSSelector(); } if (!document.getElementById('admin-view').classList.contains('hidden')) renderAdminList(); }
+function saveStores() { if (useCloud && db) saveStoresToCloud(); else localStorage.setItem('stores', JSON.stringify(stores)); }
+function saveStoresToCloud() { db.collection('shopping_data').doc('main').set({ stores: stores }).catch(e => { console.error("Save failed", e); alert("儲存失敗，請檢查網路連線。"); }); }
+function compressImage(base64Str, maxWidth = 300, quality = 0.6) { return new Promise((resolve) => { const img = new Image(); img.src = base64Str; img.onload = () => { const canvas = document.createElement('canvas'); let w = img.width, h = img.height; if (w > maxWidth) { h = Math.round((h * maxWidth) / w); w = maxWidth; } canvas.width = w; canvas.height = h; const ctx = canvas.getContext('2d'); ctx.drawImage(img, 0, 0, w, h); resolve(canvas.toDataURL('image/jpeg', quality)); }; }); }
+
+// --- UI Logic ---
+function promptPassword(target) { targetView = target; document.getElementById('modal-pwd-input').value = ''; document.getElementById('pwd-modal').classList.remove('hidden'); document.getElementById('modal-pwd-input').focus(); }
+function closeModal() { document.getElementById('pwd-modal').classList.add('hidden'); }
+function checkPassword() { if (document.getElementById('modal-pwd-input').value === '1005') { closeModal(); if (targetView === 'game') renderSetup(); else if (targetView === 'admin') showAdmin(); } else { alert('密碼錯誤'); document.getElementById('modal-pwd-input').value = ''; } }
+function openConfigModal() { document.getElementById('config-modal').classList.remove('hidden'); document.getElementById('firebase-config-input').value = localStorage.getItem('firebase_config_custom') || ''; }
+function saveFirebaseConfig() { try { const config = JSON.parse(document.getElementById('firebase-config-input').value); if(!config.apiKey || !config.projectId) throw new Error("Invalid Config"); localStorage.setItem('firebase_config_custom', JSON.stringify(config)); location.reload(); } catch(e) { document.getElementById('config-error-msg').style.display = 'block'; } }
+function exportJSON() { const blob = new Blob([JSON.stringify(stores)], {type: "application/json"}); const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = `shopping_data_${new Date().toISOString().slice(0,10)}.json`; link.click(); }
+function importJSON(input) { if(!input.files[0]) return; const r = new FileReader(); r.onload = function(e) { try { const data = JSON.parse(e.target.result); if(Array.isArray(data)) { stores = data; saveStores(); renderAdminList(); alert("匯入成功！"); } else { alert("檔案格式錯誤"); } } catch(err) { alert("檔案損毀或格式錯誤"); } input.value = ''; }; r.readAsText(input.files[0]); }
+function backToHome() { hideAll(); document.getElementById('home-view').classList.remove('hidden'); document.getElementById('body-tag').className = ''; document.getElementById('progress-bar').classList.add('hidden'); }
+function renderSetup() { hideAll(); document.getElementById('setup-view').classList.remove('hidden'); document.getElementById('store-select').innerHTML = stores.map(s => `<option value="${s.id}">${s.name}</option>`).join(''); updateSetupUI(); }
+
+function updateSetupUI() {
+    const role = document.getElementById('role-select').value;
+    const level = document.getElementById('level-select').value;
+    role==='boss'?(document.getElementById('boss-settings').classList.remove('hidden'),document.getElementById('cust-settings').classList.add('hidden')):(document.getElementById('boss-settings').classList.add('hidden'),document.getElementById('cust-settings').classList.remove('hidden'),level==='3'?document.getElementById('menu-setting').classList.remove('hidden'):document.getElementById('menu-setting').classList.add('hidden'));
+    
+    const qLabel = document.getElementById('quantity-label');
+    const dupSetting = document.getElementById('setup-duplicate');
+    const oosArea = document.getElementById('setup-oos-area');
+
+    if(['1','3'].includes(level)) { qLabel.innerText="3. 本回合要買幾樣商品/配菜？(自由選)"; dupSetting.classList.add('hidden'); }
+    else { qLabel.innerText="3. 購物清單要指定幾樣商品？(系統抽)"; dupSetting.classList.remove('hidden'); }
+
+    if(level === '5') {
+        oosArea.classList.remove('hidden');
+        updateOOSSelector();
+    } else {
+        oosArea.classList.add('hidden');
+    }
+}
+
+function updateOOSSelector() {
+    const storeId = document.getElementById('store-select').value;
+    const store = stores.find(s => s.id === storeId);
+    const count = parseInt(document.getElementById('oos-count').value) || 1;
+    const container = document.getElementById('oos-pairs-container');
+    container.innerHTML = '';
+    
+    if(store) {
+        for(let i=1; i<=count; i++) {
+            let options = store.items.map(item => `<option value="${item.id}">${item.name}</option>`).join('');
+            // 替代品預設選不同的
+            let altOptions = store.items.map((item, idx) => `<option value="${item.id}" ${idx===i?'selected':''}>${item.name}</option>`).join('');
+            
+            let html = `
+            <div class="oos-row">
+                <label>第 ${i} 組：缺貨商品 → 替代商品</label>
+                <div style="display:flex; gap:5px;">
+                    <select id="oos-item-${i}" style="flex:1;">${options}</select>
+                    <span>➡</span>
+                    <select id="alt-item-${i}" style="flex:1;">${altOptions}</select>
+                </div>
+            </div>`;
+            container.insertAdjacentHTML('beforeend', html);
+        }
+    }
+}
+
+function startGame() {
+    const store = stores.find(s => s.id === document.getElementById('store-select').value);
+    if(!store) { alert("商店資料錯誤"); return; }
+    
+    const level = document.getElementById('level-select').value;
+    let qty = parseInt(document.getElementById('item-quantity').value);
+    const allowDuplicate = document.getElementById('allow-duplicate').value === 'yes';
+
+    session = {
+        store: store, level: level, role: document.getElementById('role-select').value,
+        step: 1, itemsToBuy: [], cart: [], bossInputPrice: null, bossInputReceived: null, bossInputChange: null,
+        mathDiff: document.getElementById('math-diff').value, mathHintMode: document.getElementById('math-hint-mode').value,
+        showMenu: document.getElementById('show-menu').value === 'yes', qty: qty,
+        altResponseMode: document.getElementById('alt-response-mode').value,
+        oosPairs: []
+    };
+
+    let usedPrices = [];
+    session.store.items.forEach(item => { item.price = getUniquePrice(session.mathDiff, usedPrices); usedPrices.push(item.price); });
+
+    if(level === '5') {
+        const oosCount = parseInt(document.getElementById('oos-count').value);
+        let specifiedOOSIds = [];
+        
+        for(let i=1; i<=oosCount; i++) {
+            let oosId = document.getElementById(`oos-item-${i}`).value;
+            let altId = document.getElementById(`alt-item-${i}`).value;
+            let oosItem = store.items.find(x=>x.id==oosId);
+            let altItem = store.items.find(x=>x.id==altId);
+            
+            if(oosItem && altItem && oosItem.id === altItem.id) {
+                 let other = store.items.find(x=>x.id !== oosItem.id);
+                 if(other) altItem = other;
+            }
+
+            if(oosItem && altItem) {
+                session.oosPairs.push({oos: oosItem, alt: altItem});
+                specifiedOOSIds.push(oosItem.id);
+            }
+        }
+        
+        let minQty = session.oosPairs.length + 1; // 至少1個有貨
+        if(qty < minQty) { qty = minQty; session.qty = minQty; }
+
+        session.itemsToBuy = session.oosPairs.map(p => p.oos); 
+        
+        let pool = store.items.filter(i => !specifiedOOSIds.includes(i.id));
+        let needMore = qty - session.itemsToBuy.length;
+        
+        for(let k=0; k<needMore; k++) {
+            if(pool.length === 0 && !allowDuplicate) break;
+            let idx = Math.floor(Math.random() * pool.length);
+            session.itemsToBuy.push(pool[idx]);
+            if(!allowDuplicate) pool.splice(idx, 1);
+        }
+
+    } else if(['2','4','6'].includes(level)) {
+        let pool = session.store.items.filter(i => i.stock > 0);
+        if(pool.length === 0) { alert("此商店沒有庫存>0的商品！"); return; }
+        if(!allowDuplicate && qty > pool.length) { session.qty = pool.length; qty = pool.length; }
+        for(let i=0; i<qty; i++) {
+            if(!allowDuplicate && pool.length === 0) break;
+            let idx = Math.floor(Math.random() * pool.length);
+            session.itemsToBuy.push(pool[idx]);
+            if(!allowDuplicate) pool.splice(idx, 1);
+        }
+    }
+
+    document.getElementById('body-tag').className = session.role === 'boss' ? 'boss-mode' : 'cust-mode';
+    hideAll(); document.getElementById('game-view').classList.remove('hidden');
+    renderProgressBar(); renderStep();
+}
+
+function getUniquePrice(diff, used) {
+    let p, att=0; do { p=diff==='10'?Math.floor(Math.random()*9)+1:Math.floor(Math.random()*45)+5; att++; if(diff==='10'){if(used.filter(x=>x===p).length<3)break;}else{if(!used.includes(p))break;} } while(att<20); return p;
+}
+
+function nextStep() { if(validateCurrentStep()) { session.step++; renderStep(); updateProgressBar(); } }
+
+function validateCurrentStep() {
+    if(session.role === 'cust' && session.level === '2' && session.step === 1 && document.querySelectorAll('.check-item:not(.checked)').length > 0) { alert("請先將清單上的商品都打勾！"); return false; }
+    
+    if(session.role === 'boss') {
+        const checkVal = (id, checkFn) => {
+            const el = document.getElementById(id); if(!el) return true;
+            const val = parseInt(el.value); if(isNaN(val)) { alert("請輸入數字"); return false; }
+            return checkFn ? checkFn(val) : true;
+        };
+
+        // Step 2: Quote (Unified logic for all levels)
+        // Note: For L1/L2, we allow any input (manual check). For L3/4/5 (POS/Predefined), we can strictly check.
+        if (session.step === 2) {
+            return checkVal('boss-input-total', v => {
+                // For L3, L4, L5, we know the exact cart/list, so strict check
+                if(['3','4'].includes(session.level) || session.level === '5') {
+                    // For L5, calculation is tricky because boss adds alt items manually in step 1?
+                    // Actually in L5 Step 1 boss clicks POS. So cart is accurate.
+                    // But in v29, L5 Step 2 logic calculates "correct" based on OOS logic, NOT cart.
+                    // In v30, we must ensure boss clicks in Step 1 match.
+                    // For simplicity, let's trust what's in session.cart for POS levels (L3/4/5)
+                    // Wait, L5 Step 1 is "POS & OOS Interaction". Boss clicks items.
+                    // So session.cart has the actual items.
+                    // If boss didn't click anything? Then total is 0.
+                    let correct = 0;
+                    if(session.cart.length > 0) correct = session.cart.reduce((a,b)=>a+b.price, 0);
+                    // If cart is empty, maybe alert?
+                    if(session.cart.length === 0 && ['3','4','5'].includes(session.level)) {
+                        alert("請先在POS機點選商品！"); return false;
+                    }
+                    if(v !== correct) { alert("不對喔，我們再試試看"); return false; }
+                }
+                session.bossInputPrice = v;
+                return true;
+            });
+        }
+        
+        // Step 3: Pay
+        if(session.step === 3) {
+            return checkVal('boss-input-received', v => {
+                if(v < session.bossInputPrice) { alert("錢不夠喔，請客人再拿多一點"); return false; }
+                session.bossInputReceived=v; return true;
+            });
+        }
+
+        // Step 4: Change
+        if(session.step === 4) {
+            if(session.mathHintMode === 'fill' && document.getElementById('calc-paid')) {
+                const p = parseInt(document.getElementById('calc-paid').value);
+                const t = parseInt(document.getElementById('calc-total').value);
+                if(p !== session.bossInputReceived || t !== session.bossInputPrice) { alert("算式填錯囉！"); return false; }
+            }
+            return checkVal('boss-input-change', v => {
+                if(v !== session.bossInputReceived - session.bossInputPrice) { alert("不對喔，我們再試試看"); return false; }
+                session.bossInputChange=v; return true;
+            });
+        }
+    }
+    return true;
+}
+
+function renderStep() {
+    const btn = document.getElementById('main-action-btn');
+    btn.onclick = nextStep; btn.classList.remove('btn-success'); btn.innerText = "下一步";
+    const container = document.getElementById('card-area');
+    const scriptBubble = document.getElementById('script-area');
+    container.innerHTML = ''; scriptBubble.classList.remove('hidden');
+
+    if(session.step === 0) return; 
+
+    if(session.level === '5') renderLevel5(container, scriptBubble, btn);
+    else if(['3','4'].includes(session.level)) renderLevel3_4(container, scriptBubble, btn);
+    else renderLevel1_2(container, scriptBubble, btn);
+    
+    let maxStep = session.level === '5' ? 4 : 4; 
+    if (session.step > maxStep) renderEndScreen(container, scriptBubble, btn);
+}
+
+// L1 & L2
+function renderLevel1_2(container, scriptBubble, btn) {
+    if(session.step === 1) {
+        if(session.role === 'boss') {
+            scriptBubble.classList.add('hidden'); container.innerHTML = `<h1>⏳</h1><h2>客人正在選商品，請等待...</h2>`; btn.innerText = "客人拿商品給我了";
+        } else {
+            if(session.level === '2') {
+                scriptBubble.innerHTML = `<span class="speech-icon">🗣️</span> 我要買這些 (看清單)`;
+                container.innerHTML = `<h2>📋 購物清單檢核</h2>${session.itemsToBuy.map(i=>`<div class="check-item" onclick="this.classList.toggle('checked')">${renderItemImg(i,'small')}<span>${i.name}</span><div class="check-box"></div></div>`).join('')}`;
+            } else {
+                scriptBubble.innerHTML = `<span class="speech-icon">🗣️</span> 我要去挑喜歡的東西`;
+                container.innerHTML = `<h2>🛍️ 指令</h2><p style="font-size:2rem">請挑選你喜歡的 <span style="color:var(--rose-dark); font-weight:bold; font-size:2.5rem;">「${session.qty}」</span> 樣商品拿給老闆</p>`;
+            }
+            btn.innerText = "我挑好了，拿給老闆";
+        }
+    } else if(session.step === 2) {
+        if(session.role !== 'boss') {
+            scriptBubble.innerHTML = `<span class="speech-icon">🗣️</span> 老闆，請問多少錢？`; container.innerHTML = `<h1>🗣️</h1><p>請大聲詢問老闆</p>`; btn.innerText = "說完了";
+        } else {
+            scriptBubble.innerHTML = `<span class="speech-icon">🗣️</span> 總共 [ ? ] 元`;
+            container.innerHTML = `<h2>📋 價目表 (計算並報價)</h2><div class="item-grid">${session.store.items.map(i=>`<div class="item-card">${renderItemImg(i)}<span class="item-name">${i.name}</span><span class="item-price">$${i.price}</span></div>`).join('')}</div><hr style="width:90%;margin:15px 0;"><label>總共幾元？</label><input type="number" id="boss-input-total" class="big-input" placeholder="?" oninput="updateBubblePrice(this.value)">`;
+            btn.innerText = "報價完畢，準備收錢";
+        }
+    } else if(session.step === 3) {
+        renderCommonCheckout(3, container, scriptBubble, btn);
+    } else if(session.step === 4) {
+        renderCommonCheckout(4, container, scriptBubble, btn);
+    }
+}
+
+// L3 & L4
+function renderLevel3_4(container, scriptBubble, btn) {
+    if(session.step === 1) { // Order/POS
+        if(session.role === 'boss') {
+            scriptBubble.innerHTML = `<span class="speech-icon">🗣️</span> 好的，我幫你點餐`; renderPOS(container); btn.innerText = "點餐完畢，結帳";
+        } else {
+            if(session.level === '4') {
+                scriptBubble.innerHTML = `<span class="speech-icon">🗣️</span> 老闆，我要點...(唸出清單)`;
+                container.innerHTML = `<h2>📝 點餐任務</h2>${session.itemsToBuy.map(i=>`<div style="font-size:1.5rem; margin:10px;">🔹 ${i.name}</div>`).join('')}`;
+            } else {
+                scriptBubble.innerHTML = `<span class="speech-icon">🗣️</span> 老闆，我要點...(自己決定)`;
+                let menuHtml = session.showMenu?session.store.items.map(i=>`<div style="display:inline-block; margin:10px; text-align:center;">${renderItemImg(i,'small')}<br>${i.name}</div>`).join(''):"<h2>👂 (無菜單模式)</h2>";
+                container.innerHTML = `<h2>🤔 請挑選 <span style="color:var(--rose-dark); font-weight:bold;">「${session.qty}」</span> 樣餐點</h2><div>${menuHtml}</div>`;
+            }
+            btn.innerText = "點完了";
+        }
+    } else if(session.step === 2) { // Quote
+        if(session.role !== 'boss') {
+            scriptBubble.innerHTML = `<span class="speech-icon">🗣️</span> 請問多少錢？`; container.innerHTML = `<h1>🗣️</h1>`; btn.innerText = "說完了";
+        } else {
+            scriptBubble.innerHTML = `<span class="speech-icon">🗣️</span> 總共 [ ? ] 元`;
+            // Recalculate cart total for display
+            let listHtml = session.cart.map(c => `<li>${c.name} $${c.price}</li>`).join('');
+            container.innerHTML = `<h2>🧾 訂單確認</h2><ul style="text-align:left; font-size:1.4rem;">${listHtml}</ul><hr><label>請計算並輸入總額：</label><input type="number" id="boss-input-total" class="big-input" placeholder="?" oninput="updateBubblePrice(this.value)">`;
+            btn.innerText = "報價完畢，準備收錢";
+        }
+    } else if(session.step === 3) {
+        renderCommonCheckout(3, container, scriptBubble, btn);
+    } else if(session.step === 4) {
+        renderCommonCheckout(4, container, scriptBubble, btn);
+    }
+}
+
+// L5
+function renderLevel5(container, scriptBubble, btn) {
+    if(session.step === 1) { // Order & POS Interaction (Answer OOS/Alt)
+        if(session.role === 'boss') {
+            let hint = session.oosPairs.map(p => `${p.oos.name}❌ ➡ ${p.alt.name}⭕`).join('、');
+            scriptBubble.innerHTML = `<div class="boss-l5-hint" title="${hint}"><span class="speech-icon">🗣️</span> 提示：${hint}</div><div style="font-size:1.2rem; color:#666;">(請點擊POS機回答客人)</div>`;
+            renderPOS(container); 
+            btn.innerText = "點餐完畢，結帳";
+        } else {
+            // Guest sees list including OOS
+            let names = session.itemsToBuy.map(i => i.name).join("、");
+            scriptBubble.innerHTML = `<span class="speech-icon">🗣️</span> 老闆，我要買 ${names}`; 
+            container.innerHTML = `
+                <h2>🛍️ 購物清單</h2>
+                <div style="display:flex; justify-content:center; gap:10px; flex-wrap:wrap;">
+                    ${session.itemsToBuy.map(i => `<div class="item-card">${renderItemImg(i)}<span class="item-name">${i.name}</span></div>`).join('')}
+                </div>
+            `;
+            btn.innerText = "說完了";
+        }
+    } else if(session.step === 2) { // Quote / Guest Ask Alt
+        // L5 Guest Step 2 logic: Ask Alt
+        if(session.role === 'cust') {
+            if(session.altResponseMode === 'open') {
+                scriptBubble.innerHTML = `<span class="speech-icon">🗣️</span> 請問還有什麼？`;
+                container.innerHTML = `<h2>💡 開放式詢問</h2><p>因為缺貨了，請詢問老闆還有什麼可以買。</p>`;
+            } else {
+                let altNames = session.oosPairs.map(p => p.alt.name).join("、");
+                let altCards = session.oosPairs.map(p => `<div class="item-card">${renderItemImg(p.alt)}<span class="item-name">${p.alt.name}</span></div>`).join('');
+                scriptBubble.innerHTML = `<span class="speech-icon">🗣️</span> 那請問有 ${altNames} 嗎？`;
+                container.innerHTML = `<h2>💡 替代方案</h2><div style="display:flex; justify-content:center; gap:10px; flex-wrap:wrap;">${altCards}</div>`;
+            }
+            btn.innerText = "說完了，問價格";
+        } 
+        // L5 Boss Step 2 logic: Quote
+        else {
+            scriptBubble.innerHTML = `<span class="speech-icon">🗣️</span> 總共 [ ? ] 元`;
+            let listHtml = session.cart.map(c => `<li>${c.name} $${c.price}</li>`).join('');
+            container.innerHTML = `<h2>🧾 結帳計算</h2><ul style="text-align:left; font-size:1.4rem;">${listHtml}</ul><hr><label>總共幾元？</label><input type="number" id="boss-input-total" class="big-input" placeholder="?" oninput="updateBubblePrice(this.value)">`;
+            btn.innerText = "報價完畢";
+        }
+    } else if(session.step === 3) { // Pay / Ask Price
+         if(session.role === 'cust') {
+            scriptBubble.innerHTML = `<span class="speech-icon">🗣️</span> 請問多少錢？`; container.innerHTML = `<h1>🗣️</h1>`; btn.innerText = "說完了，付錢";
+         } else {
+            renderCommonCheckout(3, container, scriptBubble, btn);
+         }
+    } else if(session.step === 4) { // Change / Pay
+         if(session.role === 'cust') {
+             // Guest Pay (Reuse common)
+             renderCommonCheckout(3, container, scriptBubble, btn);
+         } else {
+             renderCommonCheckout(4, container, scriptBubble, btn);
+         }
+    } else if(session.step === 5) { // Guest Change
+         renderCommonCheckout(4, container, scriptBubble, btn);
+    }
+}
+
+// Common Checkout
+function renderCommonCheckout(phase, container, scriptBubble, btn) {
+    if(phase === 3) { // 付款
+         if(session.role === 'boss') {
+            scriptBubble.classList.add('hidden');
+            container.innerHTML = `<h2>💵 收銀台</h2><p style="font-size:1.5rem">應收：$${session.bossInputPrice}</p><label>收了多少錢？</label><input type="number" id="boss-input-received" class="big-input" placeholder="?">`;
+            btn.innerText = "確認金額";
+        } else {
+            scriptBubble.innerHTML = `<span class="speech-icon">🗣️</span> 付錢給老闆`;
+            container.innerHTML = `<h1>💰</h1>`;
+            btn.innerText = "拿錢給老闆";
+        }
+    } else if(phase === 4) { // 找錢/結束
+        if(session.role === 'boss') {
+            const received = session.bossInputReceived;
+            const price = session.bossInputPrice;
+            
+            if(received == price) { // 剛好
+                scriptBubble.innerHTML = `<span class="speech-icon">🗣️</span> 收您 ${received} 元，謝謝光臨！`; 
+                container.innerHTML = `<h1>✅ 剛好，不用找錢</h1>`; 
+                btn.innerText = "說完了，結束交易"; btn.classList.add('btn-success');
+                btn.onclick = () => { session.step = 100; renderStep(); }; 
+            } else { // 需找錢
+                scriptBubble.innerHTML = `<span class="speech-icon">🗣️</span> 找您 [ ? ] 元`; 
+                let mathHtml = session.mathHintMode === 'direct' ? `<div style="font-size:2rem; margin:10px;">${received} - ${price} = <span style="color:var(--rose-dark)">?</span></div>` : `<div class="math-hint-container"><div class="math-input-group"><span class="math-label">(提示: 客人付的錢)</span><input type="number" id="calc-paid" class="math-gap"></div><div class="math-symbol">-</div><div class="math-input-group"><span class="math-label">(提示: 商品總額)</span><input type="number" id="calc-total" class="math-gap"></div><div class="math-symbol">=</div><span style="color:var(--rose-dark); font-size:1.5rem">?</span></div>`;
+                container.innerHTML = `<h2>🧮 請計算找錢</h2>${mathHtml}<hr><label>應找多少錢？</label><input type="number" id="boss-input-change" class="big-input" placeholder="?" oninput="updateBubbleChange(this.value)">`;
+                btn.innerText = "確認金額";
+                btn.onclick = function() { 
+                    if(validateCurrentStep()) { 
+                        scriptBubble.innerHTML = `<span class="speech-icon">🗣️</span> 收您 ${received} 元，找您 ${session.bossInputChange} 元，謝謝光臨！`; 
+                        const inputs = container.querySelectorAll('input'); inputs.forEach(input => input.disabled = true);
+                        this.innerText = "說完了，結束交易"; this.classList.add('btn-success');
+                        this.onclick = () => { session.step = 100; renderStep(); }; 
+                    } 
+                };
+            }
+        } else {
+            scriptBubble.classList.add('hidden'); container.innerHTML = `<h2>⏳ 等待老闆找錢/結帳</h2>`; btn.innerText = "拿到發票/找錢了";
+            btn.onclick = () => { session.step = 100; renderStep(); };
+        }
+    }
+}
+
+function updateBubblePrice(val) { const b=document.querySelector('#script-area'); if(b) b.innerHTML = `<span class="speech-icon">🗣️</span> 總共 ${val} 元`; }
+function updateBubbleChange(val) { const b=document.querySelector('#script-area'); if(b) b.innerHTML = `<span class="speech-icon">🗣️</span> 找您 ${val} 元`; }
+
+// POS System (L3, L4, L5)
+function renderPOS(container) {
+    let itemsHtml = session.store.items.map(i => {
+        let inCart = session.cart.filter(c => c.id === i.id).length;
+        let remain = i.stock - inCart;
+        let disabled = remain <= 0 ? 'disabled-item' : '';
+        let clickFn = `addToCart(${i.id})`;
+        
+        // L5 缺貨標記：不擋圖片
+        let oosLabel = '';
+        if(session.level === '5' && session.oosPairs.find(p=>p.oos.id===i.id)) {
+            oosLabel = '<div class="badge-oos" style="position:absolute;top:5px;right:5px;border:2px solid red;color:red;background:white;font-size:1rem;padding:2px;">缺貨</div>';
+        }
+
+        return `<div class="item-card ${disabled}" onclick="${clickFn}">${oosLabel}${renderItemImg(i,'small')}<span class="item-name">${i.name}</span><span class="item-stock">剩: ${remain}</span></div>`;
+    }).join('');
+    let cartHtml = session.cart.length === 0 ? "(空)" : session.cart.map((c, idx) => `<div style="display:flex; justify-content:space-between; align-items:center; margin:5px 0; border-bottom:1px solid #ddd; padding:5px;"><span>${c.name}</span><button class="pos-del-btn" onclick="removeFromCart(${idx})">X</button></div>`).join('');
+    container.innerHTML = `<div style="display:flex; gap:10px; width:100%; height:100%;"><div style="flex:2;" class="item-grid">${itemsHtml}</div><div style="flex:1; background:rgba(0,0,0,0.05); padding:10px; border-radius:10px; overflow-y:auto;"><h3>已點清單</h3><div id="pos-list">${cartHtml}</div></div></div>`;
+}
+
+function addToCart(itemId) {
+    let item = session.store.items.find(i => i.id === itemId);
+    
+    // Level 5 Logic
+    if(session.level === '5' && session.role === 'boss') {
+        let oosPair = session.oosPairs.find(p => p.oos.id === itemId);
+        if(oosPair) {
+             const b=document.querySelector('#script-area');
+             if(b) b.innerHTML = `<span class="speech-icon">🗣️</span> ${item.name} 沒有喔，賣完了`;
+             return; // 不加入清單
+        }
+        let altPair = session.oosPairs.find(p => p.alt.id === itemId);
+        if(altPair) {
+             const b=document.querySelector('#script-area');
+             if(b) b.innerHTML = `<span class="speech-icon">🗣️</span> 有喔，我們有 ${item.name}`;
+        } else {
+             const b=document.querySelector('#script-area'); // Normal item
+             if(b) b.innerHTML = `<span class="speech-icon">🗣️</span> 好的，${item.name}`;
+        }
+    }
+
+    let inCart = session.cart.filter(c => c.id === itemId).length;
+    if(inCart >= item.stock) return;
+    session.cart.push({id: item.id, name: item.name, price: item.price});
+    renderPOS(document.getElementById('card-area'));
+}
+
+function removeFromCart(idx) {
+    session.cart.splice(idx, 1);
+    renderPOS(document.getElementById('card-area'));
+}
+
+function renderProgressBar() {
+    const bar = document.getElementById('progress-bar'); bar.classList.remove('hidden');
+    let steps = [];
+    if(session.level === '5') {
+        if(session.role === 'boss') steps = ['點餐/缺貨', '計算報價', '付款/收錢', '找錢/完成'];
+        else steps = ['選購/點餐', '詢問/替代', '詢問價格', '付款', '找錢/完成'];
+    }
+    else if (['3','4'].includes(session.level)) steps = ['點餐/POS', '計算報價', '付款/收錢', '找錢/完成'];
+    else steps = ['選購/清單', '計算報價', '付款/收錢', '找錢/完成'];
+    
+    bar.style.setProperty('--step-count', steps.length);
+    bar.innerHTML = `<div class="progress-track-container"><div class="progress-track-bg"></div><div class="progress-track-fill" id="progress-track-fill"></div></div>` + steps.map((s, idx) => `<div class="progress-step" id="prog-step-${idx}"><span>${s}</span></div>`).join('');
+    updateProgressBar();
+}
+
+function updateProgressBar() {
+    const total = document.querySelectorAll('.progress-step').length;
+    let idx = session.step - 1;
+    if(idx >= total) idx = total - 1;
+    document.querySelectorAll('.progress-step').forEach((el, i) => { i<=idx?el.classList.add('active'):el.classList.remove('active'); });
+    const fill = document.getElementById('progress-track-fill');
+    if(fill && total > 1) fill.style.width = ((idx/(total-1))*100) + "%";
+}
+
+function renderEndScreen(container, scriptBubble, btn) {
+    scriptBubble.classList.add('hidden'); container.innerHTML = `<h1 style="font-size:4rem; color:var(--rose-dark); margin-top:50px;">交易成功！🎉</h1><p>做得很好！</p>`;
+    btn.innerText = "🏠 返回首頁"; btn.classList.remove('btn-success'); btn.onclick = () => location.reload(); document.getElementById('progress-bar').classList.add('hidden');
+}
+
+function renderItemImg(item, size='normal') { return item.imgType==='url'&&item.imgData?`<img src="${item.imgData}" class="item-img-real" style="${size==='small'?'width:50px;height:50px;':'width:100px;height:100px;'}">`:`<span class="item-img" style="${size==='small'?'font-size:2rem':''}">${item.icon}</span>`; }
+function showAdmin() { hideAll(); document.getElementById('admin-view').classList.remove('hidden'); renderAdminList(); }
+function renderAdminList() {
+    const div = document.getElementById('admin-list');
+    div.innerHTML = stores.map((s, sIdx) => `
+        <div class="admin-store-box">
+            <div class="store-header"><div style="flex-grow:1;" onclick="toggleStore(${sIdx})"><span id="icon-s-${sIdx}" class="store-toggle-icon">▼</span><input type="text" class="store-name-input" value="${s.name}" onclick="event.stopPropagation()" onchange="updateStoreName(${sIdx}, this.value)"></div><div><button class="btn btn-danger" style="padding:8px 15px; font-size:1rem; display:inline-block;" onclick="event.stopPropagation(); requestDeleteStore(this, ${sIdx})">刪除商店</button></div></div>
+            <div id="store-items-${sIdx}" class="store-items collapsed">${s.items.map((item, iIdx) => `<div class="admin-item-row"><div style="width:60px; text-align:center;">${renderItemImg(item, 'small')}</div><input type="text" value="${item.name}" style="width:120px;" onchange="updateItem(${sIdx}, ${iIdx}, 'name', this.value)"> 庫存: <input type="number" value="${item.stock}" style="width:60px;" onchange="updateItem(${sIdx}, ${iIdx}, 'stock', this.value)"> <label class="file-upload-btn">更換圖片<input type="file" accept="image/*" style="display:none" onchange="uploadImg(${sIdx}, ${iIdx}, this)"></label> <button class="btn btn-danger" style="padding:5px 10px; font-size:0.9rem; margin-left:auto;" onclick="requestDeleteItem(this, ${sIdx}, ${iIdx})">X</button></div>`).join('')}<div style="text-align:center; margin-top:15px;"><button class="btn btn-success" style="padding:8px 20px; font-size:1rem; width:auto;" onclick="addItem(${sIdx})">+ 新增商品</button></div></div></div>`).join('');
+}
+window.toggleStore = function(sIdx) { const el=document.getElementById(`store-items-${sIdx}`), icon=document.getElementById(`icon-s-${sIdx}`); el.classList.toggle('collapsed'); icon.innerText=el.classList.contains('collapsed')?'▼':'▲'; }
+window.updateStoreName = function(sIdx, newName) { stores[sIdx].name = newName; saveStores(); };
+window.updateItem = function(sIdx, iIdx, field, val) { if(field==='stock') val=parseInt(val); stores[sIdx].items[iIdx][field] = val; saveStores(); };
+window.uploadImg = function(sIdx, iIdx, input) { if(input.files[0]) { var r = new FileReader(); r.onload = function(e) { compressImage(e.target.result).then(compressed => { stores[sIdx].items[iIdx].imgType='url'; stores[sIdx].items[iIdx].imgData=compressed; saveStores(); renderAdminList(); setTimeout(()=>toggleStore(sIdx),100); }); }; r.readAsDataURL(input.files[0]); } };
+window.addItem = function(sIdx) { stores[sIdx].items.push({id:Date.now(), name:'新商品', icon:'📦', imgType:'icon', stock:5}); saveStores(); renderAdminList(); setTimeout(()=>toggleStore(sIdx),100); };
+window.requestDeleteStore = function(btn, sIdx) { if(btn.getAttribute('data-confirm')==='true') { stores.splice(sIdx, 1); saveStores(); renderAdminList(); } else { btn.setAttribute('data-confirm','true'); btn.innerText="確定刪除?"; btn.classList.remove('btn-danger'); btn.classList.add('btn-warning'); setTimeout(()=>{ if(document.body.contains(btn)){btn.setAttribute('data-confirm','false'); btn.innerText="刪除商店"; btn.classList.remove('btn-warning'); btn.classList.add('btn-danger');} }, 3000); } };
+window.requestDeleteItem = function(btn, sIdx, iIdx) { if(btn.getAttribute('data-confirm')==='true') { stores[sIdx].items.splice(iIdx, 1); saveStores(); renderAdminList(); setTimeout(()=>toggleStore(sIdx),100); } else { btn.setAttribute('data-confirm','true'); btn.innerText="確定?"; btn.classList.remove('btn-danger'); btn.classList.add('btn-warning'); setTimeout(()=>{ if(document.body.contains(btn)){btn.setAttribute('data-confirm','false'); btn.innerText="X"; btn.classList.remove('btn-warning'); btn.classList.add('btn-danger');} }, 3000); } };
+window.addNewStore = function() { const n=prompt("請輸入新商店名稱"); if(n){ stores.push({id:'s'+Date.now(), name:n, items:[]}); saveStores(); renderAdminList(); } };
+window.downloadSampleCSV = function() { const blob=new Blob(["\uFEFF商店名稱,商品名稱,庫存\n美味漢堡店,漢堡,5"], {type:'text/csv;charset=utf-8;'}); const link=document.createElement("a"); link.href=URL.createObjectURL(blob); link.download="商店匯入範例.csv"; link.click(); };
+window.processCSV = function(input) { if(!input.files[0])return; const r=new FileReader(); r.onload=function(e){ const rows=e.target.result.split('\n'); let cnt=0; rows.forEach((r,i)=>{ if(i===0)return; const c=r.trim().split(','); if(c.length<3)return; const sn=c[0].trim(), iname=c[1].trim(), st=parseInt(c[2].trim())||0; if(!sn||!iname)return; let s=stores.find(x=>x.name===sn); if(!s){s={id:'s'+Date.now()+Math.random(),name:sn,items:[]}; stores.push(s);} s.items.push({id:Date.now()+Math.random(),name:iname,icon:'📦',imgType:'icon',stock:st}); cnt++; }); saveStores(); renderAdminList(); alert(`成功匯入 ${cnt} 個商品！`); input.value=''; }; r.readAsText(input.files[0]); };
+function resetDefaultData() { if(confirm('確定重置？')) { localStorage.removeItem('stores'); location.reload(); } }
+function hideAll() { ['home-view','setup-view','game-view','admin-view'].forEach(id=>document.getElementById(id).classList.add('hidden')); }
+
+// Init
+initApp();
+</script>
+</body>
+</html>
